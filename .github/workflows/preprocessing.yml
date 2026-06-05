@@ -1,0 +1,58 @@
+name: Automated Preprocessing
+
+# Kriteria 1 (Advanced): jalankan preprocessing otomatis lalu simpan dataset
+# hasil preprocessing terbaru kembali ke repository.
+on:
+  push:
+    paths:
+      - "breast_cancer_raw/**"
+      - "preprocessing/automate_*.py"
+      - ".github/workflows/preprocessing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # diperlukan agar workflow boleh commit hasil ke repo
+
+jobs:
+  preprocess:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scikit-learn==1.5.2 pandas==2.2.3 numpy==1.26.4 joblib==1.4.2
+
+      - name: Run automated preprocessing
+        run: |
+          python "preprocessing/automate_tian.py" \
+            --input "breast_cancer_raw/breast_cancer_raw.csv" \
+            --outdir "preprocessing/breast_cancer_preprocessing"
+
+      - name: Show generated files
+        run: ls -lah preprocessing/breast_cancer_preprocessing
+
+      - name: Commit & push latest preprocessed dataset
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add preprocessing/breast_cancer_preprocessing
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan dataset hasil preprocessing."
+          else
+            git commit -m "chore: update preprocessed dataset via CI [skip ci]"
+            git push
+          fi
+
+      - name: Upload preprocessed dataset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: breast_cancer_preprocessing
+          path: preprocessing/breast_cancer_preprocessing
